@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openjdk-17-jdk \
     python3 \
     python3-pip \
+    chromium \
     && rm -rf /var/lib/apt/lists/*
 
 RUN git clone --depth 1 --branch stable https://github.com/flutter/flutter.git /usr/local/flutter \
@@ -44,6 +45,7 @@ RUN git clone --depth 1 --branch stable https://github.com/flutter/flutter.git /
 
 ENV ANDROID_SDK_ROOT=/opt/android-sdk
 ENV ANDROID_HOME=/opt/android-sdk
+ENV CHROME_EXECUTABLE=/usr/bin/chromium
 ENV PATH="/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/platform-tools:/usr/local/flutter/bin:/usr/local/flutter/bin/cache/dart-sdk/bin:${PATH}"
 
 RUN mkdir -p /opt/android-sdk/cmdline-tools && \
