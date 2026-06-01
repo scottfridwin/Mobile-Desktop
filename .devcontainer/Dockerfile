@@ -10,11 +10,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
     build-essential \
     ca-certificates \
+    clang \
+    cmake \
     curl \
     git \
     git-lfs \
     gnupg2 \
     lsb-release \
+    mesa-utils \
+    ninja-build \
     unzip \
     xz-utils \
     zip \
@@ -51,8 +55,9 @@ RUN mkdir -p /opt/android-sdk/cmdline-tools && \
 RUN yes | sdkmanager --sdk_root=${ANDROID_SDK_ROOT} --licenses
 RUN sdkmanager --sdk_root=${ANDROID_SDK_ROOT} \
     "platform-tools" \
-    "platforms;android-34" \
-    "build-tools;34.0.0" \
+    "platforms;android-36" \
+    "build-tools;28.0.3" \
+    "build-tools;36.0.0" \
     "cmdline-tools;latest"
 
 RUN flutter --version
