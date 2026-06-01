@@ -471,16 +471,8 @@ class PluginSyncService extends ChangeNotifier {
         jellyfinToken: token,
       );
 
-      if (!status.authenticated &&
-          status.enabled &&
-          username != null &&
-          username.isNotEmpty &&
-          password != null &&
-          password.isNotEmpty) {
-        await seerrRepo.loginWithMoonfin(
-          username: username,
-          password: password,
-        );
+      if (!status.authenticated && status.enabled) {
+        await seerrRepo.loginWithMoonfinToken(authType: 'jellyfin');
       }
     } catch (_) {}
   }

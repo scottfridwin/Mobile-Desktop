@@ -340,6 +340,41 @@ class SeerrRepository {
     return response;
   }
 
+  Future<MoonfinLoginResponse> loginWithMoonfinToken({
+    String authType = 'jellyfin',
+  }) async {
+    await ensureInitialized();
+    final client = _httpClient;
+    if (client == null || !client.isProxyMode) {
+      throw StateError('Not in Moonfin proxy mode');
+    }
+
+    final response = await client.moonfinLogin(
+      username: '',
+      password: '',
+      authType: authType,
+    );
+
+    if (response.success) {
+      await _store.setString(
+        _moonfinDisplayNameKey,
+        response.displayName ?? '',
+      );
+      await _store.setString(
+        _moonfinUserIdKey,
+        response.jellyseerrUserId?.toString() ?? '',
+      );
+      await _store.setString(_authMethodKey, 'moonfin');
+      await _store.setBool(_enabledKey, true);
+      await _store.setBool(_lastConnectionSuccessKey, true);
+      _isMoonfinMode = true;
+      _isAvailable = true;
+      _invalidateSessionCache();
+    }
+
+    return response;
+  }
+
   Future<void> logoutMoonfin() async {
     final client = _httpClient;
     if (client != null && client.isProxyMode) {
