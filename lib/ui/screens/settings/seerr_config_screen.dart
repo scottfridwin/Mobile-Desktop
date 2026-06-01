@@ -115,6 +115,26 @@ class _SeerrConfigScreenState extends State<SeerrConfigScreen> {
   ) async {
     final l10n = AppLocalizations.of(context);
     try {
+      if (authType == 'sso') {
+        // Attempt to configure Seerr via Moonfin proxy using the current Jellyfin session
+        try {
+          final client = GetIt.instance<MediaServerClient>();
+          final sync = GetIt.instance<PluginSyncService>();
+          await sync.configureSeerr(client);
+        } catch (_) {
+          return l10n.loginFailed;
+        }
+
+        await _seerrPrefs.setEnabled(true);
+        await GetIt.instance<UserPreferences>().set(
+          UserPreferences.seerrEnabled,
+          true,
+        );
+        await _pushSync();
+        await _loadSeerrStatus();
+        return null;
+      }
+
       final repo = await GetIt.instance.getAsync<SeerrRepository>();
       final response = await repo.loginWithMoonfin(
         username: username,
@@ -467,6 +487,7 @@ class _SeerrLoginCardState extends State<_SeerrLoginCard> {
   final _usernameFocus = FocusNode(debugLabel: 'seerr_username');
   final _passwordFocus = FocusNode(debugLabel: 'seerr_password');
   final _jellyfinAuthFocus = FocusNode(debugLabel: 'seerr_auth_jellyfin');
+  final _ssoAuthFocus = FocusNode(debugLabel: 'seerr_auth_sso');
   final _localAuthFocus = FocusNode(debugLabel: 'seerr_auth_local');
   final _signInFocus = FocusNode(debugLabel: 'seerr_sign_in');
   final _signOutFocus = FocusNode(debugLabel: 'seerr_sign_out');
@@ -526,6 +547,7 @@ class _SeerrLoginCardState extends State<_SeerrLoginCard> {
     _usernameFocus.dispose();
     _passwordFocus.dispose();
     _jellyfinAuthFocus.dispose();
+    _ssoAuthFocus.dispose();
     _localAuthFocus.dispose();
     _signInFocus.dispose();
     _signOutFocus.dispose();
@@ -725,6 +747,14 @@ class _SeerrLoginCardState extends State<_SeerrLoginCard> {
       event,
       currentAuthType: 'local',
       leftFocus: _jellyfinAuthFocus,
+    );
+  }
+
+  KeyEventResult _onSsoAuthKey(FocusNode node, KeyEvent event) {
+    return _onAuthOptionKey(
+      event,
+      currentAuthType: 'sso',
+      leftFocus: _localAuthFocus,
     );
   }
 
@@ -984,6 +1014,18 @@ class _SeerrLoginCardState extends State<_SeerrLoginCard> {
             ),
           ),
         ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: FocusTraversalOrder(
+            order: const NumericFocusOrder(0.2),
+            child: _buildAuthOption(
+              authType: 'sso',
+              label: 'SSO',
+              focusNode: _ssoAuthFocus,
+              onKeyEvent: PlatformDetection.isTV ? _onSsoAuthKey : null,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1115,6 +1157,7 @@ class _SeerrLoginCardState extends State<_SeerrLoginCard> {
 
   Widget _buildSignInCard(AppLocalizations l10n) {
     final isLocalAuth = _authType == 'local';
+    final isSsoAuth = _authType == 'sso';
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -1133,45 +1176,55 @@ class _SeerrLoginCardState extends State<_SeerrLoginCard> {
                 const SizedBox(height: 14),
                 _buildAuthTypeSelector(l10n),
                 const SizedBox(height: 12),
-                FocusTraversalOrder(
-                  order: const NumericFocusOrder(1),
-                  child: _buildCredentialsField(
-                    label: isLocalAuth ? l10n.email : l10n.username,
-                    controller: _usernameController,
-                    focusNode: _usernameFocus,
-                    tvFieldKey: _usernameTvFieldKey,
-                    tvType: TextFieldType.other,
-                    obscureText: false,
-                    textInputAction: TextInputAction.next,
-                    keyboardType: isLocalAuth
-                        ? TextInputType.emailAddress
-                        : TextInputType.text,
-                    autofillHints: [
-                      if (isLocalAuth)
-                        AutofillHints.email
-                      else
-                        AutofillHints.username,
-                    ],
-                    onSubmitted: () => _passwordFocus.requestFocus(),
-                    onTvKey: _onUsernameKey,
+                if (!isSsoAuth)
+                  FocusTraversalOrder(
+                    order: const NumericFocusOrder(1),
+                    child: _buildCredentialsField(
+                      label: isLocalAuth ? l10n.email : l10n.username,
+                      controller: _usernameController,
+                      focusNode: _usernameFocus,
+                      tvFieldKey: _usernameTvFieldKey,
+                      tvType: TextFieldType.other,
+                      obscureText: false,
+                      textInputAction: TextInputAction.next,
+                      keyboardType: isLocalAuth
+                          ? TextInputType.emailAddress
+                          : TextInputType.text,
+                      autofillHints: [
+                        if (isLocalAuth)
+                          AutofillHints.email
+                        else
+                          AutofillHints.username,
+                      ],
+                      onSubmitted: () => _passwordFocus.requestFocus(),
+                      onTvKey: _onUsernameKey,
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Text(
+                      'Use SSO (Quick Connect) to authenticate via your Jellyfin session.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
                   ),
-                ),
                 const SizedBox(height: 12),
-                FocusTraversalOrder(
-                  order: const NumericFocusOrder(2),
-                  child: _buildCredentialsField(
-                    label: l10n.password,
-                    controller: _passwordController,
-                    focusNode: _passwordFocus,
-                    tvFieldKey: _passwordTvFieldKey,
-                    tvType: TextFieldType.password,
-                    obscureText: true,
-                    textInputAction: TextInputAction.done,
-                    keyboardType: TextInputType.visiblePassword,
-                    onSubmitted: _submitSignIn,
-                    onTvKey: _onPasswordKey,
+                if (!isSsoAuth)
+                  FocusTraversalOrder(
+                    order: const NumericFocusOrder(2),
+                    child: _buildCredentialsField(
+                      label: l10n.password,
+                      controller: _passwordController,
+                      focusNode: _passwordFocus,
+                      tvFieldKey: _passwordTvFieldKey,
+                      tvType: TextFieldType.password,
+                      obscureText: true,
+                      textInputAction: TextInputAction.done,
+                      keyboardType: TextInputType.visiblePassword,
+                      onSubmitted: _submitSignIn,
+                      onTvKey: _onPasswordKey,
+                    ),
                   ),
-                ),
                 if (_errorMessage != null) ...[
                   const SizedBox(height: 10),
                   Text(
@@ -1196,7 +1249,7 @@ class _SeerrLoginCardState extends State<_SeerrLoginCard> {
                         }
                       },
                       child: FilledButton(
-                        onPressed: _canSignIn ? _submitSignIn : null,
+                        onPressed: (_authType == 'sso') ? _submitSignIn : (_canSignIn ? _submitSignIn : null),
                         child: _submitting
                             ? const SizedBox(
                                 width: 18,
@@ -1205,7 +1258,7 @@ class _SeerrLoginCardState extends State<_SeerrLoginCard> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : Text(l10n.signIn),
+                            : Text(_authType == 'sso' ? 'Use SSO' : l10n.signIn),
                       ),
                     ),
                   ),
